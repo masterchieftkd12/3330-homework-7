@@ -144,6 +144,11 @@ th {
     color: #ef6c00;
 }
 
+.status-inactive {
+    background: #fdecea;
+    color: #c62828;
+}
+
 .form-row {
     margin-bottom: 15px;
 }
@@ -203,4 +208,8 @@ th {
 .pagination a.disabled {
     pointer-events: none;
     opacity: 0.4;
+}
+
+.pagination span {
+    padding: 8px 6px;
 }

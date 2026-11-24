@@ -1,201 +1,184 @@
 $(function () {
-    // *********************************************************************
-    // Feel free to modify/remove the JS objects below.
-    // *********************************************************************
+    const username = "UTRGV Vaqueros";
+    const CUSTOMERS_PER_PAGE = 10;
 
-    let revenueAmt = "$35,800";
-    let customerNum = "1,284";
-    let ordersAmt = "342";
-    let issuesAmt = "12";
-    let username = "UTRGV Vaqueros";
-    let notifAmt = 3;
+    const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const number = new Intl.NumberFormat("en-US");
 
-    const customers = [
-        {
-            "name": "Alice Johnson",
-            "email": "alice@example.com",
-            "status": "Active",
-            "joined": "09/10/2026"
-        },
-        {
-            "name": "Robert Smith",
-            "email": "robert@example.com",
-            "status": "Pending",
-            "joined": "09/12/2026"
-        },
-        {
-            "name": "Maria Garcia",
-            "email": "maria@example.com",
-            "status": "Active",
-            "joined": "09/15/2026"
-        }
-    ];
+    // Escape text from the database before inserting it as HTML
+    function escapeHtml(text) {
+        return $("<div>").text(text == null ? "" : String(text)).html();
+    }
 
-    const sales = [
-        {
-            "product": "Product A",
-            "quantity": "124",
-            "revenue": "$12,400"
-        },
-        {
-            "product": "Product B",
-            "quantity": "98",
-            "revenue": "$9,800"
-        },
-        {
-            "product": "Product C",
-            "quantity": "75",
-            "revenue": "$7,500"
-        },
-    ];
+    // "2026-09-15" -> "09/15/2026"
+    function formatDate(isoDate) {
+        const [y, m, d] = String(isoDate).split("-");
+        return `${m}/${d}/${y}`;
+    }
 
-    const activities = [
-        {
-            "message" : "New customer registered"
-        },
-        {
-            "message" : "Order #10482 completed"
-        },
-        {
-            "message" : "Payment received"
-        },
-        {
-            "message" : "Support ticket created"
-        }
-    ];
+    function capitalize(text) {
+        text = String(text);
+        return text.charAt(0).toUpperCase() + text.slice(1);
+    }
 
-    const messages = [
-        {
-            "messsage" : "All systems operational"
-        },
-        {
-            "messsage" : "All settings loaded for this system"
-        }
-    ];
+    function showError(selector, message) {
+        $(selector).text(message || "Could not load data");
+    }
 
-    const notifications = [
-        {
-            "messsage": "A new shipment is expected to arrive on Sep 30, 2026"
-        },
-        {
-            "messsage": "There are 12 outstanding issues with last week's orders"
-        },
-        {
-            "messsage": "Three new customers joined our platform in the last month"
-        },
-    ];
+    function fillList(selector, alerts) {
+        const list = $(selector).empty();
+        alerts.forEach(alert => {
+            list.append($("<li>").text(alert.description));
+        });
+    }
 
-    const tasks = [
-       {
-            "messsage": "Review orders"
-        },
-        {
-            "messsage": "Contact customer"
-        },
-        {
-            "messsage": "Generate report"
-        },
-    ]
+    // Welcome message
+    $("#username").text(username);
 
-    // There are 13 requirements to implement. 
-    const userNameObj = $("#username");
-    userNameObj.append(`${username}`);
 
-    const cardRevenue = $(".revenue-amt");   // this must select the class .revenue-amt, which will affect two elements. So count this 2 times.
-    cardRevenue.append(`${revenueAmt}`);
+    // Revenue (two elements share the .revenue-amt class)
+    $.getJSON("/api/sales/revenue")
+        .done(data => $(".revenue-amt").text(currency.format(data.revenue)))
+        .fail(() => showError(".revenue-amt", "N/A"));
 
-    const cardCustomers = $("#customer-num");
-    cardCustomers.append(`${customerNum}`);
+    $.getJSON("/api/customers/count")
+        .done(data => $("#customer-num").text(number.format(data.count)))
+        .fail(() => showError("#customer-num", "N/A"));
 
-    const cardOrders = $("#orders-amt");
-    cardOrders.append(`${ordersAmt}`);
+    $.getJSON("/api/orders/count")
+        .done(data => $("#orders-amt").text(number.format(data.count)))
+        .fail(() => showError("#orders-amt", "N/A"));
 
-    const cardIssues = $("#issues-amt");
-    cardIssues.append(`${issuesAmt}`);
+    $.getJSON("/api/alerts/issues/count")
+        .done(data => $("#issues-amt").text(number.format(data.count)))
+        .fail(() => showError("#issues-amt", "N/A"));
 
-    const notificationNumber = $("#notification-num");
-    notificationNumber.append(`${notifAmt}`);
+    $.getJSON("/api/sales")
+        .done(sales => {
+            const salesTableBody = $("#salesTableBody").empty();
+            sales.forEach(sale => {
+                const row = $("<tr>");
+                row.html(`
+                    <td>${escapeHtml(sale.name)}</td>
+                    <td>${number.format(sale.quantity)}</td>
+                    <td>${currency.format(sale.saleamount)}</td>
+                `);
+                salesTableBody.append(row);
+            });
+        })
+        .fail(() => $("#salesTableBody").html('<tr><td colspan="3">Could not load sales</td></tr>'));
 
-    const tableBody = $("#customerTableBody");
 
-    customers.forEach(customer => {
-        const row = $("<tr>");
+    function renderCustomers(customers) {
+        const tableBody = $("#customerTableBody").empty();
 
-        var statusClass;
-            if (customer.status.toLowerCase() === "active"){
+        customers.forEach(customer => {
+            const status = String(customer.status).toLowerCase();
+            let statusClass;
+            if (status === "active") {
                 statusClass = "status-active";
+            } else if (status === "inactive") {
+                statusClass = "status-inactive";
             } else {
                 statusClass = "status-pending";
             }
-        row.html(`
-            <td>${customer.name}</td>
-            <td>${customer.email}</td>
-            <td>
-                <span class="status ${statusClass}">
-                    ${customer.status}
-                </span>
-            </td>
-            <td>${customer.joined}</td>
-        `);
 
-        tableBody.append(row);
+            const row = $("<tr>");
+            row.html(`
+                <td>${escapeHtml(customer.name)}</td>
+                <td>${escapeHtml(customer.email)}</td>
+                <td>
+                    <span class="status ${statusClass}">
+                        ${escapeHtml(capitalize(customer.status))}
+                    </span>
+                </td>
+                <td>${formatDate(customer.datejoined)}</td>
+            `);
+            tableBody.append(row);
+        });
+    }
+
+    // Page numbers to show: first, last, and a window around the current page
+    function pageList(current, totalPages) {
+        const pages = [];
+        const windowSize = 2;
+        for (let p = 1; p <= totalPages; p++) {
+            if (p === 1 || p === totalPages || Math.abs(p - current) <= windowSize) {
+                pages.push(p);
+            } else if (pages[pages.length - 1] !== "…") {
+                pages.push("…");
+            }
+        }
+        return pages;
+    }
+
+    function renderPagination(page, totalPages) {
+        const container = $("#customerPagination").empty();
+
+        const link = (label, target, extraClass) =>
+            $("<a href='#'>")
+                .text(label)
+                .addClass(extraClass || "")
+                .attr("data-page", target);
+
+        container.append(link("« Prev", page - 1, page <= 1 ? "disabled" : ""));
+
+        pageList(page, totalPages).forEach(p => {
+            if (p === "…") {
+                container.append($("<span>").text("…"));
+            } else {
+                container.append(link(p, p, p === page ? "active" : ""));
+            }
+        });
+
+        container.append(link("Next »", page + 1, page >= totalPages ? "disabled" : ""));
+    }
+
+    function loadCustomers(page) {
+        $.getJSON("/api/customers", { page: page, limit: CUSTOMERS_PER_PAGE })
+            .done(data => {
+                renderCustomers(data.customers);
+                renderPagination(data.page, data.totalPages);
+            })
+            .fail(() => $("#customerTableBody").html('<tr><td colspan="4">Could not load customers</td></tr>'));
+    }
+
+    $("#customerPagination").on("click", "a", function (event) {
+        event.preventDefault();
+        if ($(this).hasClass("disabled") || $(this).hasClass("active")) {
+            return;
+        }
+        loadCustomers(Number($(this).attr("data-page")));
     });
 
-   
-    const salesTableBody = $("#salesTableBody");
+    loadCustomers(1);
 
-    sales.forEach(sale => {
-        const row = $("<tr>");
+    function refreshAccordion() {
+        // Content height changed after loading, so let the accordion recalculate
+        $("#accordion").accordion("refresh");
+    }
 
-        row.html(`
-            <td>${sale.product}</td>
-            <td>${sale.quantity}</td>
-            <td>${sale.revenue}</td>
-        `);
+    $.getJSON("/api/alerts/issues")
+        .done(issues => { fillList("#system-status-list", issues); refreshAccordion(); })
+        .fail(() => showError("#system-status-list", "Could not load issues"));
 
-        salesTableBody.append(row);
-    });
+    $.getJSON("/api/alerts/notifications/count")
+        .done(data => $("#notification-num").text(number.format(data.count)))
+        .fail(() => showError("#notification-num", "N/A"));
 
-    const activityList = $("#activity-list");
+    $.getJSON("/api/alerts/notifications")
+        .done(notifications => { fillList("#notifications-list", notifications); refreshAccordion(); })
+        .fail(() => showError("#notifications-list", "Could not load notifications"));
 
-    activities.forEach(activity => {
-        const li = $("<li>");
-        li.html(`${activity.message}`);
-        activityList.append(li);
-    });
-
- 
-    const systemStatusList = $("#system-status-list");
-
-    messages.forEach(msg => {
-        const li = $("<li>");
-        li.html(`${msg.messsage}`);
-        systemStatusList.append(li);
-    });
-
-
-    const notificationsList = $("#notifications-list");
-
-    notifications.forEach(notif => {
-        const li = $("<li>");
-        li.html(`${notif.messsage}`);
-        notificationsList.append(li);
-    });
-
-
-    const tasksList = $("#tasks-list");
-
-    tasks.forEach(task => {
-        const li = $("<li>");
-        li.html(`${task.messsage}`);
-        tasksList.append(li);
-    });
+    $.getJSON("/api/alerts/tasks")
+        .done(tasks => { fillList("#tasks-list", tasks); refreshAccordion(); })
+        .fail(() => showError("#tasks-list", "Could not load tasks"));
 
 
     // All six jQuery UI functions
 
     $("button").button();
-       
+
     $("#dashboardTabs").tabs();
 
     $("#customerDate").datepicker();
@@ -238,9 +221,4 @@ $(function () {
         }
     );
 
-
-
-       
-
-
-    });
+});
